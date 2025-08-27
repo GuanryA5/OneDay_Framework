@@ -1,0 +1,53 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+    "name": "oneday-framework",
+    "version-string": "1.0.0",
+    "description": "OneDay Game Scripting Development Framework",
+    "homepage": "https://github.com/OneDay-Framework",
+    "dependencies": [
+        {
+            "name": "qtbase",
+            "features": [
+                "widgets"
+            ]
+        },
+        {
+            "name": "qttools"
+        },
+        {
+            "name": "opencv4"
+        },
+        {
+            "name": "onnx"
+        },
+        {
+            "name": "gtest"
+        },
+        {
+            "name": "boost-geometry"
+        },
+        {
+            "name": "eigen3"
+        },
+        {
+            "name": "nlohmann-json"
+        },
+        {
+            "name": "spdlog"
+        }
+    ],
+    "features": {
+        "gpu": {
+            "description": "Enable GPU acceleration support",
+            "dependencies": [
+                "onnxruntime-gpu"
+            ]
+        },
+        "tests": {
+            "description": "Build with testing framework",
+            "dependencies": [
+                "gtest"
+            ]
+        }
+    }
+}

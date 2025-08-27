@@ -1,0 +1,60 @@
+name: "CodeQL Security Analysis"
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * 1'  # 每周一凌晨2点运行
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-extended,security-and-quality
+
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Setup vcpkg (minimal for CodeQL)
+      run: |
+        git clone https://github.com/Microsoft/vcpkg.git vcpkg
+        cd vcpkg
+        .\bootstrap-vcpkg.bat
+        
+    - name: Configure CMake (minimal build for analysis)
+      run: |
+        cmake -S . -B build `
+          -DCMAKE_BUILD_TYPE=Debug `
+          -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
+          
+    - name: Build for CodeQL
+      run: |
+        cmake --build build --config Debug --target CoreEngine
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
