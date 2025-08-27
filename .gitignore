@@ -155,3 +155,7 @@ docs/latex/
 *.bak
 *.backup
 *~
+
+
+* ai promt docs
+.bmad

@@ -11,6 +11,7 @@
 通过分析 GitHub Actions 日志，发现了以下问题：
 
 #### 1. vcpkg 命令语法错误 (Release 构建)
+
 ```
 error: unexpected option: --manifest-root=D:\a\OneDay_Framework\OneDay_Framework
 ```
@@ -18,6 +19,7 @@ error: unexpected option: --manifest-root=D:\a\OneDay_Framework\OneDay_Framework
 **原因**: 使用了不支持的 `--manifest-root` 参数
 
 #### 2. vcpkg 克隆失败 (Debug 构建)
+
 ```
 fatal: fetch-pack: invalid index-pack output
 ```
@@ -26,12 +28,38 @@ fatal: fetch-pack: invalid index-pack output
 
 ## ✅ 解决方案
 
-### 修复 1: vcpkg Manifest 模式配置
+### 修复 1: CMake 命令行语法错误
+
+**问题**: PowerShell 反引号换行导致参数解析错误
+**错误信息**:
+
+```
+CMake Warning: Ignoring extra path from command line: ".cmake"
+Could not find toolchain file: "vcpkg/scripts/buildsystems/vcpkg"
+```
+
+**修复前**:
+
+```yaml
+cmake -S . -B build `
+-DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+-DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake `
+-DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
+```
+
+**修复后**:
+
+```yaml
+cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
+```
+
+### 修复 2: vcpkg Manifest 模式配置
 
 **问题**: 错误使用了 `--manifest-root` 参数
 **解决**: 移除手动安装步骤，让 CMake 自动处理
 
 **修复前**:
+
 ```yaml
 - name: Install dependencies
   run: |
@@ -40,6 +68,7 @@ fatal: fetch-pack: invalid index-pack output
 ```
 
 **修复后**:
+
 ```yaml
 - name: Install dependencies
   run: |
@@ -49,7 +78,8 @@ fatal: fetch-pack: invalid index-pack output
 
 ### 修复 2: vcpkg 集成方式
 
-**原理**: 
+**原理**:
+
 - 项目使用 vcpkg manifest 模式 (有 `vcpkg.json` 文件)
 - CMake 配置时会自动读取 `vcpkg.json` 并安装依赖
 - 不需要手动运行 `vcpkg install`
@@ -65,11 +95,13 @@ fatal: fetch-pack: invalid index-pack output
 ### 关键配置更改
 
 #### CI Workflow (`.github/workflows/ci.yml`)
+
 - ✅ 移除了错误的 `--manifest-root` 参数
 - ✅ 依赖安装改为 CMake 自动处理
 - ✅ 保持缓存策略不变
 
 #### Release Workflow (`.github/workflows/release.yml`)
+
 - ✅ 应用相同的修复
 - ✅ 确保发布构建的一致性
 
@@ -78,11 +110,13 @@ fatal: fetch-pack: invalid index-pack output
 ### 推送修复后检查
 
 1. **GitHub Actions 状态**:
+
    - [ ] CI workflow 成功运行
    - [ ] Debug 和 Release 构建都通过
    - [ ] 测试执行成功
 
 2. **构建产物**:
+
    - [ ] OneDay_Framework.exe 生成
    - [ ] 所有 DLL 依赖正确复制
    - [ ] 测试结果上传
@@ -128,7 +162,7 @@ git push
 ```
 ✅ Checkout repository
 ✅ Setup MSVC
-✅ Setup CMake  
+✅ Setup CMake
 ✅ Cache vcpkg
 ✅ Setup vcpkg
 ✅ Install dependencies (自动)
@@ -148,6 +182,7 @@ git push
 ### 短期改进
 
 1. **增强缓存策略**:
+
    - 缓存编译后的依赖
    - 优化缓存键生成
 
@@ -158,6 +193,7 @@ git push
 ### 长期改进
 
 1. **多平台支持**:
+
    - 添加 Linux 构建
    - 添加 macOS 构建
 
@@ -171,6 +207,7 @@ git push
 ### 常见问题
 
 1. **vcpkg 仍然失败**:
+
    ```yaml
    # 添加重试机制
    - name: Setup vcpkg (with retry)
@@ -187,6 +224,7 @@ git push
    ```
 
 2. **依赖安装超时**:
+
    ```yaml
    # 增加超时时间
    - name: Configure CMake
@@ -206,7 +244,7 @@ git push
 1. **查看详细日志**: GitHub Actions → 失败的 workflow → 展开步骤
 2. **检查依赖**: 确认 `vcpkg.json` 中的包名正确
 3. **本地测试**: 在本地环境复现问题
-4. **社区支持**: 
+4. **社区支持**:
    - [vcpkg Issues](https://github.com/Microsoft/vcpkg/issues)
    - [GitHub Actions Community](https://github.community/)
 
