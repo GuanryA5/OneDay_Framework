@@ -2,143 +2,143 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
-  workflow_dispatch:  # 允许手动触发
+    branches: [main, develop]
+  workflow_dispatch: # 允许手动触发
 
 env:
   # vcpkg 配置
   VCPKG_ROOT: ${{ github.workspace }}/vcpkg
   VCPKG_DEFAULT_TRIPLET: x64-windows
-  
+
 jobs:
   build-and-test:
     runs-on: windows-latest
-    
+
     strategy:
       matrix:
         build_type: [Debug, Release]
-        
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        
-    - name: Setup MSVC
-      uses: microsoft/setup-msbuild@v2
-      
-    - name: Setup CMake
-      uses: lukka/get-cmake@latest
-      
-    - name: Cache vcpkg
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ env.VCPKG_ROOT }}
-          !${{ env.VCPKG_ROOT }}/buildtrees
-          !${{ env.VCPKG_ROOT }}/packages
-          !${{ env.VCPKG_ROOT }}/downloads
-        key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
-        restore-keys: |
-          vcpkg-${{ runner.os }}-
-          
-    - name: Setup vcpkg
-      run: |
-        if (!(Test-Path "${{ env.VCPKG_ROOT }}")) {
-          git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
-        }
-        cd ${{ env.VCPKG_ROOT }}
-        .\bootstrap-vcpkg.bat
-        .\vcpkg integrate install
-        
-    - name: Install dependencies
-      run: |
-        cd ${{ env.VCPKG_ROOT }}
-        .\vcpkg install --triplet=${{ env.VCPKG_DEFAULT_TRIPLET }} --manifest-root=${{ github.workspace }}
-        
-    - name: Configure CMake
-      run: |
-        cmake -S . -B build `
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake `
-          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
-          
-    - name: Build project
-      run: |
-        cmake --build build --config ${{ matrix.build_type }} --parallel
-        
-    - name: Run unit tests
-      run: |
-        cd build/bin/${{ matrix.build_type }}
-        .\unit_tests.exe --gtest_output=xml:test_results.xml
-        
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-${{ matrix.build_type }}
-        path: build/bin/${{ matrix.build_type }}/test_results.xml
-        
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      if: matrix.build_type == 'Release'
-      with:
-        name: oneday-framework-${{ matrix.build_type }}
-        path: |
-          build/bin/${{ matrix.build_type }}/OneDay_Framework.exe
-          build/bin/${{ matrix.build_type }}/*.dll
-          
-    - name: Check for warnings
-      run: |
-        # 检查构建日志中是否有警告
-        $buildLog = Get-Content "build/CMakeFiles/CMakeOutput.log" -Raw -ErrorAction SilentlyContinue
-        if ($buildLog -match "warning") {
-          Write-Host "⚠️ Build warnings detected!"
-          exit 1
-        } else {
-          Write-Host "✅ No build warnings detected"
-        }
-        
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.VCPKG_ROOT }}
+            !${{ env.VCPKG_ROOT }}/buildtrees
+            !${{ env.VCPKG_ROOT }}/packages
+            !${{ env.VCPKG_ROOT }}/downloads
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Setup vcpkg
+        run: |
+          if (!(Test-Path "${{ env.VCPKG_ROOT }}")) {
+            git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+          }
+          cd ${{ env.VCPKG_ROOT }}
+          .\bootstrap-vcpkg.bat
+          .\vcpkg integrate install
+
+      - name: Install dependencies
+        run: |
+          # vcpkg 会在 CMake 配置时自动安装 manifest 依赖
+          Write-Host "Dependencies will be installed automatically during CMake configuration"
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake `
+            -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
+
+      - name: Build project
+        run: |
+          cmake --build build --config ${{ matrix.build_type }} --parallel
+
+      - name: Run unit tests
+        run: |
+          cd build/bin/${{ matrix.build_type }}
+          .\unit_tests.exe --gtest_output=xml:test_results.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.build_type }}
+          path: build/bin/${{ matrix.build_type }}/test_results.xml
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: matrix.build_type == 'Release'
+        with:
+          name: oneday-framework-${{ matrix.build_type }}
+          path: |
+            build/bin/${{ matrix.build_type }}/OneDay_Framework.exe
+            build/bin/${{ matrix.build_type }}/*.dll
+
+      - name: Check for warnings
+        run: |
+          # 检查构建日志中是否有警告
+          $buildLog = Get-Content "build/CMakeFiles/CMakeOutput.log" -Raw -ErrorAction SilentlyContinue
+          if ($buildLog -match "warning") {
+            Write-Host "⚠️ Build warnings detected!"
+            exit 1
+          } else {
+            Write-Host "✅ No build warnings detected"
+          }
+
   code-quality:
     runs-on: windows-latest
     needs: build-and-test
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Run clang-format check
-      run: |
-        # 检查代码格式 (如果有 .clang-format 文件)
-        if (Test-Path ".clang-format") {
-          Write-Host "🔍 Checking code format..."
-          # 这里可以添加 clang-format 检查
-        } else {
-          Write-Host "ℹ️ No .clang-format file found, skipping format check"
-        }
-        
-    - name: Generate build report
-      run: |
-        Write-Host "📊 Generating build quality report..."
-        $report = @"
-        # Build Quality Report
-        
-        **Date**: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-        **Commit**: ${{ github.sha }}
-        **Branch**: ${{ github.ref_name }}
-        
-        ## Status
-        - ✅ Build: Success
-        - ✅ Tests: Passed
-        - ✅ Warnings: None
-        
-        "@
-        $report | Out-File -FilePath "build_report.md" -Encoding UTF8
-        
-    - name: Upload build report
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-report
-        path: build_report.md
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run clang-format check
+        run: |
+          # 检查代码格式 (如果有 .clang-format 文件)
+          if (Test-Path ".clang-format") {
+            Write-Host "🔍 Checking code format..."
+            # 这里可以添加 clang-format 检查
+          } else {
+            Write-Host "ℹ️ No .clang-format file found, skipping format check"
+          }
+
+      - name: Generate build report
+        run: |
+          Write-Host "📊 Generating build quality report..."
+          $report = @"
+          # Build Quality Report
+
+          **Date**: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+          **Commit**: ${{ github.sha }}
+          **Branch**: ${{ github.ref_name }}
+
+          ## Status
+          - ✅ Build: Success
+          - ✅ Tests: Passed
+          - ✅ Warnings: None
+
+          "@
+          $report | Out-File -FilePath "build_report.md" -Encoding UTF8
+
+      - name: Upload build report
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-report
+          path: build_report.md

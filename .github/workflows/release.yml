@@ -3,13 +3,13 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'  # 触发条件：推送 v* 标签 (如 v1.0.0)
-  workflow_dispatch:  # 允许手动触发
+      - "v*" # 触发条件：推送 v* 标签 (如 v1.0.0)
+  workflow_dispatch: # 允许手动触发
     inputs:
       version:
-        description: 'Release version (e.g., v1.0.0)'
+        description: "Release version (e.g., v1.0.0)"
         required: true
-        default: 'v1.0.0'
+        default: "v1.0.0"
 
 env:
   VCPKG_ROOT: ${{ github.workspace }}/vcpkg
@@ -18,157 +18,157 @@ env:
 jobs:
   create-release:
     runs-on: windows-latest
-    
+
     outputs:
       version: ${{ steps.get_version.outputs.version }}
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # 获取完整历史用于生成 changelog
-        
-    - name: Get version
-      id: get_version
-      run: |
-        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-          $version = "${{ github.event.inputs.version }}"
-        } else {
-          $version = "${{ github.ref_name }}"
-        }
-        echo "version=$version" >> $env:GITHUB_OUTPUT
-        echo "Version: $version"
-        
-    - name: Generate changelog
-      id: changelog
-      run: |
-        $version = "${{ steps.get_version.outputs.version }}"
-        $changelog = @"
-        # OneDay Framework $version
-        
-        ## 🚀 新功能
-        - 完整的蓝图编辑器框架
-        - 核心引擎系统
-        - Qt6 用户界面
-        
-        ## 🔧 改进
-        - 零编译警告
-        - 完整的单元测试覆盖
-        - 自动化 CI/CD 流程
-        
-        ## 📦 包含内容
-        - OneDay_Framework.exe - 主应用程序
-        - 所有必要的运行时依赖
-        - 用户文档和构建指南
-        
-        ## 📋 系统要求
-        - Windows 10/11 (x64)
-        - Visual C++ Redistributable 2022
-        
-        "@
-        $changelog | Out-File -FilePath "CHANGELOG.md" -Encoding UTF8
-        
-        # 转义换行符用于 GitHub Actions
-        $changelogEscaped = $changelog -replace "`r`n", "%0A" -replace "`n", "%0A"
-        echo "changelog=$changelogEscaped" >> $env:GITHUB_OUTPUT
-        
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.get_version.outputs.version }}
-        release_name: OneDay Framework ${{ steps.get_version.outputs.version }}
-        body: ${{ steps.changelog.outputs.changelog }}
-        draft: false
-        prerelease: false
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整历史用于生成 changelog
+
+      - name: Get version
+        id: get_version
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ github.event.inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}"
+          }
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "Version: $version"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          $version = "${{ steps.get_version.outputs.version }}"
+          $changelog = @"
+          # OneDay Framework $version
+
+          ## 🚀 新功能
+          - 完整的蓝图编辑器框架
+          - 核心引擎系统
+          - Qt6 用户界面
+
+          ## 🔧 改进
+          - 零编译警告
+          - 完整的单元测试覆盖
+          - 自动化 CI/CD 流程
+
+          ## 📦 包含内容
+          - OneDay_Framework.exe - 主应用程序
+          - 所有必要的运行时依赖
+          - 用户文档和构建指南
+
+          ## 📋 系统要求
+          - Windows 10/11 (x64)
+          - Visual C++ Redistributable 2022
+
+          "@
+          $changelog | Out-File -FilePath "CHANGELOG.md" -Encoding UTF8
+
+          # 转义换行符用于 GitHub Actions
+          $changelogEscaped = $changelog -replace "`r`n", "%0A" -replace "`n", "%0A"
+          echo "changelog=$changelogEscaped" >> $env:GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: OneDay Framework ${{ steps.get_version.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: false
 
   build-release:
     runs-on: windows-latest
     needs: create-release
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        
-    - name: Setup MSVC
-      uses: microsoft/setup-msbuild@v2
-      
-    - name: Setup CMake
-      uses: lukka/get-cmake@latest
-      
-    - name: Cache vcpkg
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ env.VCPKG_ROOT }}
-          !${{ env.VCPKG_ROOT }}/buildtrees
-          !${{ env.VCPKG_ROOT }}/packages
-          !${{ env.VCPKG_ROOT }}/downloads
-        key: vcpkg-release-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
-        
-    - name: Setup vcpkg
-      run: |
-        if (!(Test-Path "${{ env.VCPKG_ROOT }}")) {
-          git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
-        }
-        cd ${{ env.VCPKG_ROOT }}
-        .\bootstrap-vcpkg.bat
-        .\vcpkg integrate install
-        
-    - name: Install dependencies
-      run: |
-        cd ${{ env.VCPKG_ROOT }}
-        .\vcpkg install --triplet=${{ env.VCPKG_DEFAULT_TRIPLET }} --manifest-root=${{ github.workspace }}
-        
-    - name: Configure CMake for Release
-      run: |
-        cmake -S . -B build `
-          -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake `
-          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
-          
-    - name: Build Release
-      run: |
-        cmake --build build --config Release --parallel
-        
-    - name: Run tests
-      run: |
-        cd build/bin/Release
-        .\unit_tests.exe
-        
-    - name: Package release
-      run: |
-        $version = "${{ needs.create-release.outputs.version }}"
-        $packageName = "OneDay_Framework_$version"
-        
-        # 创建发布目录
-        New-Item -ItemType Directory -Path "release" -Force
-        New-Item -ItemType Directory -Path "release/$packageName" -Force
-        
-        # 复制主要文件
-        Copy-Item "build/bin/Release/OneDay_Framework.exe" "release/$packageName/"
-        Copy-Item "build/bin/Release/*.dll" "release/$packageName/" -ErrorAction SilentlyContinue
-        
-        # 复制文档
-        Copy-Item "README.md" "release/$packageName/"
-        Copy-Item "docs/" "release/$packageName/docs/" -Recurse -ErrorAction SilentlyContinue
-        
-        # 创建 ZIP 包
-        Compress-Archive -Path "release/$packageName/*" -DestinationPath "release/$packageName.zip"
-        
-        echo "PACKAGE_NAME=$packageName" >> $env:GITHUB_ENV
-        
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./release/${{ env.PACKAGE_NAME }}.zip
-        asset_name: ${{ env.PACKAGE_NAME }}.zip
-        asset_content_type: application/zip
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.VCPKG_ROOT }}
+            !${{ env.VCPKG_ROOT }}/buildtrees
+            !${{ env.VCPKG_ROOT }}/packages
+            !${{ env.VCPKG_ROOT }}/downloads
+          key: vcpkg-release-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Setup vcpkg
+        run: |
+          if (!(Test-Path "${{ env.VCPKG_ROOT }}")) {
+            git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+          }
+          cd ${{ env.VCPKG_ROOT }}
+          .\bootstrap-vcpkg.bat
+          .\vcpkg integrate install
+
+      - name: Install dependencies
+        run: |
+          # vcpkg 会在 CMake 配置时自动安装 manifest 依赖
+          Write-Host "Dependencies will be installed automatically during CMake configuration"
+
+      - name: Configure CMake for Release
+        run: |
+          cmake -S . -B build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake `
+            -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
+
+      - name: Build Release
+        run: |
+          cmake --build build --config Release --parallel
+
+      - name: Run tests
+        run: |
+          cd build/bin/Release
+          .\unit_tests.exe
+
+      - name: Package release
+        run: |
+          $version = "${{ needs.create-release.outputs.version }}"
+          $packageName = "OneDay_Framework_$version"
+
+          # 创建发布目录
+          New-Item -ItemType Directory -Path "release" -Force
+          New-Item -ItemType Directory -Path "release/$packageName" -Force
+
+          # 复制主要文件
+          Copy-Item "build/bin/Release/OneDay_Framework.exe" "release/$packageName/"
+          Copy-Item "build/bin/Release/*.dll" "release/$packageName/" -ErrorAction SilentlyContinue
+
+          # 复制文档
+          Copy-Item "README.md" "release/$packageName/"
+          Copy-Item "docs/" "release/$packageName/docs/" -Recurse -ErrorAction SilentlyContinue
+
+          # 创建 ZIP 包
+          Compress-Archive -Path "release/$packageName/*" -DestinationPath "release/$packageName.zip"
+
+          echo "PACKAGE_NAME=$packageName" >> $env:GITHUB_ENV
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./release/${{ env.PACKAGE_NAME }}.zip
+          asset_name: ${{ env.PACKAGE_NAME }}.zip
+          asset_content_type: application/zip
